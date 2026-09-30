@@ -1,5 +1,5 @@
 /* Solar Inverter Bento Card
- * Version: 1.0.0 (Concept B - Bento tiles with capacity bars)
+ * Version: 1.1.0 (hero removed - tiles only, per user request)
  * Custom Lovelace card: minimal bento-style monitoring for micro inverters.
  */
 
@@ -106,7 +106,7 @@ class SolarInverterBentoCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 4;
+    return 3;
   }
 
   _render() {
@@ -127,9 +127,6 @@ class SolarInverterBentoCard extends HTMLElement {
       const pct = rated > 0 && ac != null ? Math.max(0, Math.min(100, (ac / rated) * 100)) : 0;
       return { inv, ac, acV, acA, pv, pvV, pvA, live, rated, pct };
     });
-
-    const totalAc = tiles.reduce((s, t) => s + (t.ac || 0), 0);
-    const anyLive = tiles.some((t) => t.live);
 
     const tilesHtml = tiles.map((t) => `
       <div class="tile" data-entity="${t.inv.entity_ac_power || ""}">
@@ -152,58 +149,6 @@ class SolarInverterBentoCard extends HTMLElement {
         ha-card {
           padding: 16px;
           font-family: var(--paper-font-body1_-_font-family, inherit);
-        }
-        .card-title {
-          font-size: 1.1em;
-          font-weight: 600;
-          color: var(--primary-text-color);
-          margin-bottom: 12px;
-        }
-        .hero {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 14px;
-        }
-        .sun-badge {
-          width: 46px;
-          height: 46px;
-          border-radius: 13px;
-          background: rgba(255, 171, 0, 0.14);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex: none;
-        }
-        .sun-badge ha-icon {
-          --mdc-icon-size: 26px;
-          color: #ffab00;
-        }
-        .hero-total {
-          font-size: 1.7em;
-          font-weight: 700;
-          line-height: 1.1;
-          color: var(--primary-text-color);
-          font-variant-numeric: tabular-nums;
-        }
-        .hero-sub {
-          font-size: 0.85em;
-          color: var(--secondary-text-color);
-          margin-top: 2px;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .hero-sub .dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          background: var(--success-color, #67c23a);
-          flex: none;
-        }
-        .hero-sub .dot.off {
-          background: var(--secondary-text-color);
-          opacity: 0.5;
         }
         .bento-grid {
           display: grid;
@@ -298,14 +243,6 @@ class SolarInverterBentoCard extends HTMLElement {
       </style>
 
       <ha-card>
-        <div class="card-title">${cfg.name}</div>
-        <div class="hero">
-          <div class="sun-badge"><ha-icon icon="mdi:weather-sunny"></ha-icon></div>
-          <div>
-            <div class="hero-total">${Math.round(totalAc).toLocaleString("en-US")} <small style="font-size: 0.55em; font-weight: 500; color: var(--secondary-text-color);">W</small></div>
-            <div class="hero-sub"><span class="dot${anyLive ? "" : " off"}"></span>Live solar output</div>
-          </div>
-        </div>
         <div class="bento-grid">${tilesHtml}</div>
       </ha-card>
     `;
