@@ -1,5 +1,5 @@
 /* Solar Inverter Bento Card
- * Version: 1.1.0 (hero removed - tiles only, per user request)
+ * Version: 1.2.0 (Added temperature sensor inline with power)
  * Custom Lovelace card: minimal bento-style monitoring for micro inverters.
  */
 
@@ -9,6 +9,7 @@ const DEFAULT_INVERTERS = [
   {
     name: "Micro SG600",
     rated_power: 600,
+    entity_temp: "",
     entity_ac_power: "sensor.smart_inverter_power",
     entity_ac_voltage: "sensor.smart_inverter_ac_voltage",
     entity_ac_current: "sensor.smart_inverter_ac_current",
@@ -19,6 +20,7 @@ const DEFAULT_INVERTERS = [
   {
     name: "Micro BFAD",
     rated_power: 800,
+    entity_temp: "",
     entity_ac_power: "sensor.solar_inverter_800w_ac_active_power",
     entity_ac_voltage: "sensor.solar_inverter_800w_ac_voltage_2",
     entity_ac_current: "sensor.solar_inverter_800w_ac_current_2",
@@ -49,6 +51,9 @@ function fmtV(v) {
 function fmtA(v) {
   return v == null ? "—" : String(parseFloat(v.toFixed(2)));
 }
+function fmtTemp(v) {
+  return v == null ? "—" : String(parseFloat(v.toFixed(1)));
+}
 
 class SolarInverterBentoCard extends HTMLElement {
   static getConfigElement() {
@@ -73,6 +78,7 @@ class SolarInverterBentoCard extends HTMLElement {
       inverters: inverters.map((inv) => ({
         name: inv.name || "Inverter",
         rated_power: inv.rated_power != null ? Number(inv.rated_power) : 0,
+        entity_temp: inv.entity_temp || "",
         entity_ac_power: inv.entity_ac_power || "",
         entity_ac_voltage: inv.entity_ac_voltage || "",
         entity_ac_current: inv.entity_ac_current || "",
@@ -91,7 +97,7 @@ class SolarInverterBentoCard extends HTMLElement {
     // Re-render only when a displayed value actually changed.
     const snap = JSON.stringify(
       this._config.inverters.map((inv) =>
-        ["entity_ac_power", "entity_ac_voltage", "entity_ac_current",
+        ["entity_temp", "entity_ac_power", "entity_ac_voltage", "entity_ac_current",
          "entity_pv_power", "entity_pv_voltage", "entity_pv_current"]
           .map((k) => {
             const s = hass.states[inv[k]];
@@ -116,6 +122,7 @@ class SolarInverterBentoCard extends HTMLElement {
     const cfg = this._config;
 
     const tiles = cfg.inverters.map((inv) => {
+      const temp = numOrNull(hass, inv.entity_temp);
       const ac = numOrNull(hass, inv.entity_ac_power);
       const acV = numOrNull(hass, inv.entity_ac_voltage);
       const acA = numOrNull(hass, inv.entity_ac_current);
@@ -125,7 +132,7 @@ class SolarInverterBentoCard extends HTMLElement {
       const live = ac != null && ac > LIVE_THRESHOLD_W;
       const rated = inv.rated_power > 0 ? inv.rated_power : 0;
       const pct = rated > 0 && ac != null ? Math.max(0, Math.min(100, (ac / rated) * 100)) : 0;
-      return { inv, ac, acV, acA, pv, pvV, pvA, live, rated, pct };
+      return { inv, temp, ac, acV, acA, pv, pvV, pvA, live, rated, pct };
     });
 
     const tilesHtml = tiles.map((t) => `
@@ -134,7 +141,12 @@ class SolarInverterBentoCard extends HTMLElement {
           <span class="tile-name">${t.inv.name}</span>
           <span class="live${t.live ? "" : " off"}"><span class="dot"></span>${t.live ? "Live" : "Idle"}</span>
         </div>
-        <div class="tile-power">${fmtW(t.ac)} <small>W</small></div>
+        
+        <div class="power-row">
+          <div class="tile-power">${fmtW(t.ac)} <small>W</small></div>
+          ${t.temp != null ? `<div class="tile-temp"><ha-icon icon="mdi:thermometer"></ha-icon>${fmtTemp(t.temp)} °C</div>` : ""}
+        </div>
+
         ${t.rated > 0 ? `<div class="bar"><i style="width: ${t.pct.toFixed(1)}%"></i></div>` : ""}
         <div class="stats">
           <div class="stat"><div class="k">PV</div><div class="v">${fmtW(t.pv)}<small>W</small></div></div>
@@ -194,13 +206,21 @@ class SolarInverterBentoCard extends HTMLElement {
         .live.off {
           color: var(--secondary-text-color);
         }
+        
+        /* จัด Layout แถว Power และ Temp */
+        .power-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline; /* จัดให้ฐานตัวอักษรตรงกัน */
+          margin: 2px 0 10px;
+        }
         .tile-power {
           font-size: 1.9em;
           font-weight: 700;
           line-height: 1.1;
           color: var(--primary-text-color);
           font-variant-numeric: tabular-nums;
-          margin: 2px 0 10px;
+          margin: 0;
         }
         .tile-power small, .stat .v small {
           font-size: 0.55em;
@@ -208,6 +228,18 @@ class SolarInverterBentoCard extends HTMLElement {
           color: var(--secondary-text-color);
           margin-left: 1px;
         }
+        .tile-temp {
+          font-size: 0.85em;
+          font-weight: 500;
+          color: var(--secondary-text-color, #9e9e9e); /* สีเทา */
+          display: inline-flex;
+          align-items: center;
+          gap: 2px;
+        }
+        .tile-temp ha-icon {
+          --mdc-icon-size: 14px; /* ไอคอนตัวเล็ก */
+        }
+
         .bar {
           height: 6px;
           border-radius: 3px;
@@ -308,6 +340,7 @@ class SolarInverterBentoCardEditor extends HTMLElement {
   _invFields(idx, inv) {
     const p = `inv${idx}`;
     const rows = [
+      ["entity_temp", "Temperature entity (°C)"],
       ["entity_ac_power", "AC Power entity (W)"],
       ["entity_ac_voltage", "AC Voltage entity (V)"],
       ["entity_ac_current", "AC Current entity (A)"],
@@ -365,14 +398,12 @@ class SolarInverterBentoCardEditor extends HTMLElement {
       <div class="hint">แก้ไขได้ 2 เครื่องใน editor — ถ้ามีเครื่องที่ 3 ขึ้นไป เพิ่มผ่าน YAML ได้ (inverters: [...])</div>
     `;
 
-    const $ = (id) => this.shadowRoot.getElementById(id);
-    $("name").addEventListener("change", (e) => this._valueChanged("name", e.target.value));
+    const $= (id) => this.shadowRoot.getElementById(id);$("name").addEventListener("change", (e) => this._valueChanged("name", e.target.value));
     [0, 1].forEach((idx) => {
       const p = `inv${idx}`;
-      const numFields = ["rated_power"];
       $(`${p}_name`).addEventListener("change", (e) => this._invChanged(idx, "name", e.target.value));
       $(`${p}_rated`).addEventListener("change", (e) => this._invChanged(idx, "rated_power", Number(e.target.value) || 0));
-      ["entity_ac_power", "entity_ac_voltage", "entity_ac_current",
+      ["entity_temp", "entity_ac_power", "entity_ac_voltage", "entity_ac_current",
        "entity_pv_power", "entity_pv_voltage", "entity_pv_current"].forEach((f) => {
         $(`${p}_${f}`).addEventListener("change", (e) => this._invChanged(idx, f, e.target.value.trim()));
       });
@@ -396,5 +427,5 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "solar-inverter-bento-card",
   name: "Solar Inverter Bento Card",
-  description: "Minimal bento-style monitoring card for solar micro inverters with capacity bars.",
+  description: "Minimal bento-style monitoring card for solar micro inverters with capacity bars and temperature.",
 });
